@@ -9,8 +9,8 @@ An Enterprise Ticket Management & SQL-Driven Support Intelligence Platform built
 | Member | Focus Area | Status | Key Deliverables |
 | :--- | :--- | :---: | :--- |
 | **Member 1** | **Database Architect, Auth & Core OOP** | ✅ **Implemented** | `schema.sql`, `seed_data.sql`, `views.sql`, `core/models.py`, `core/repositories.py`, `core/auth.py`, `core/logger.py` |
-| **Member 2** | **Ticket Operations & SLA Engine** | 🤝 *Integrated via Core* | Lifecycle status transitions, SLA rules, workload allocation, resolution logging |
-| **Member 3** | **Advanced SQL Analytics & BI** | 🤝 *Integrated via Core* | Complex queries, SQL views, procedures, ranking & SLA breach intelligence |
+| **Member 2** | **Ticket Operations & SLA Engine** | ✅ **Implemented** | `tickets/ticket_manager.py`, `tickets/ticket_assignment.py`, `tickets/ticket_history.py`, `tickets/sla_manager.py`, `tickets/ticket_filters.py` |
+| **Member 3** | **Advanced SQL Analytics & BI** | ✅ **Implemented** | Complex queries, SQL views, procedures, ranking & SLA breach intelligence |
 | **Member 4** | **Streamlit UI/UX & Dashboards** | ✅ **Implemented** | `app.py`, `dashboard/ui_components.py`, `dashboard/charts.py`, Employee / Agent / Executive Dashboards |
 
 ---
@@ -96,6 +96,23 @@ it_helpdesk_system/
 │   ├── auth.py                 # Bcrypt password security & Session RBAC
 │   ├── exceptions.py           # Domain-specific custom exceptions
 │   └── logger.py               # Structured audit logging (logs/app.log)
+│
+├── tickets/                    # 👤 Member 2 Deliverables
+│   ├── ticket_manager.py       # Core Ticket CRUD, Lifecycle & Resolution
+│   ├── ticket_assignment.py    # Manual & Smart Workload-Aware Auto Routing
+│   ├── ticket_history.py       # Complete Audit Trail & Stage Durations
+│   ├── sla_manager.py          # SLA Deadlines, Breach Checks & Compliance
+│   ├── ticket_filters.py       # Multi-criteria Filter Service & DataFrame Export
+│   └── __init__.py             # Module Exports
+│
+├── analytics/                  # 👤 Member 3 Deliverables
+│   ├── sql_queries.py          # Advanced SQL queries, CTEs, Window functions
+│   ├── agent_analysis.py       # Agent performance & leaderboard analytics
+│   ├── department_analysis.py  # Department ticket volume & SLA analysis
+│   ├── sla_analysis.py         # SLA compliance & breach metrics
+│   ├── workload_analysis.py    # Agent workload capacity & distribution
+│   ├── recurring_issues.py     # Recurring problem identification
+│   └── reports.py              # Exportable BI reports
 │
 ├── dashboard/                  # 👤 Member 4 Deliverables
 │   ├── ui_components.py        # CSS design system, KPI cards & badges

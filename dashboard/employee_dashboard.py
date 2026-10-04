@@ -22,17 +22,27 @@ def render_employee_dashboard():
     if not employee:
         if user.role == "Admin":
             all_employees = emp_repo.get_all()
-            if all_employees:
-                st.info("ℹ️ **Admin Mode:** You are logged in as Administrator. Select an employee to view/submit tickets on their behalf:")
-                emp_names = {f"{e.full_name} ({e.department.name})": e for e in all_employees}
-                selected_emp_name = st.selectbox("Simulate Employee Account", list(emp_names.keys()), key="admin_emp_sim")
-                employee = emp_names[selected_emp_name]
+            st.info("ℹ️ **Admin Mode:** You can submit/view tickets as Administrator or simulate any employee:")
+            sim_options = {"👑 My Admin Account": None}
+            for e in all_employees:
+                sim_options[f"{e.full_name} ({e.department.name})"] = e
+            
+            selected_label = st.selectbox("Active Persona", list(sim_options.keys()), key="admin_emp_sim")
+            if sim_options[selected_label] is not None:
+                employee = sim_options[selected_label]
             else:
-                st.warning("⚠️ No employee records found in database. Run seed_db.py to populate employees.")
-                return
+                employee = emp_repo.create_or_link_employee(user.user_id, full_name="System Administrator", job_title="IT Administrator")
         else:
-            st.warning("⚠️ Employee profile not linked. Please contact IT administrator.")
-            return
+            # Auto-provision employee profile for support agents, team leads, or newly registered users
+            employee = emp_repo.create_or_link_employee(
+                user_id=user.user_id,
+                full_name=user.username.replace("_", " ").title(),
+                job_title=user.role if user.role != "Employee" else "Staff Specialist"
+            )
+
+    if not employee:
+        st.error("⚠️ Unable to initialize employee profile. Please refresh the page.")
+        return
 
     st.markdown(f"### 👋 Employee Portal: **{employee.full_name}**")
     st.caption(f"🏢 Department: **{employee.department.name}** | 💼 Role: **{employee.job_title}**")

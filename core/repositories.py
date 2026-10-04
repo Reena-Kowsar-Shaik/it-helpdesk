@@ -169,6 +169,52 @@ class EmployeeRepository(BaseRepository):
             if not self._external_session:
                 session.close()
 
+    def create_or_link_employee(
+        self,
+        user_id: int,
+        department_id: Optional[int] = None,
+        full_name: Optional[str] = None,
+        phone: Optional[str] = None,
+        job_title: Optional[str] = None
+    ) -> Employee:
+        """Create or auto-link an Employee profile for a user if one does not exist."""
+        with db.get_session() as session:
+            existing = session.query(Employee).options(joinedload(Employee.department)).filter(Employee.user_id == user_id).first()
+            if existing:
+                return existing
+
+            user = session.query(User).filter(User.user_id == user_id).first()
+            if not user:
+                raise EntityNotFoundError("User", user_id)
+
+            if not department_id:
+                # Prefer IT Infrastructure or Information Technology, else first department
+                it_dept = session.query(Department).filter(
+                    (Department.name.ilike("%Information Technology%")) | (Department.name.ilike("%IT%"))
+                ).first()
+                if it_dept:
+                    department_id = it_dept.department_id
+                else:
+                    first_dept = session.query(Department).first()
+                    department_id = first_dept.department_id if first_dept else 1
+
+            name = full_name or user.username.replace("_", " ").title()
+            emp = Employee(
+                user_id=user_id,
+                department_id=department_id,
+                full_name=name,
+                phone=phone or "+1-555-0100",
+                job_title=job_title or (user.role if user.role != "Employee" else "Staff Specialist")
+            )
+            session.add(emp)
+            session.flush()
+            session.refresh(emp)
+            if emp.department:
+                _ = emp.department.name
+            log_audit("EMPLOYEE_PROFILE_LINKED", user.username, f"Auto-created employee profile for user ID {user_id}")
+            return emp
+
+
 
 class AgentRepository(BaseRepository):
     """Support Agent repository."""

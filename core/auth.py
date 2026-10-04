@@ -3,7 +3,7 @@
 import bcrypt
 from typing import Optional, Dict, Any, List
 from core.database import db
-from core.models import User, Employee, SupportAgent
+from core.models import User, Employee, SupportAgent, Department, SupportTeam
 from core.repositories import UserRepository, EmployeeRepository, AgentRepository
 from core.exceptions import InvalidLoginError, UnauthorizedAccessError, UserAlreadyExistsError
 from core.logger import log_audit, log_error
@@ -69,6 +69,78 @@ class AuthService:
             password_hash=hashed_pw,
             role=role
         )
+
+    def register_user_with_profile(
+        self,
+        username: str,
+        email: str,
+        plain_password: str,
+        role: str = "Employee",
+        full_name: str = "",
+        department_id: Optional[int] = None,
+        phone: Optional[str] = None,
+        job_title: Optional[str] = None,
+        team_id: Optional[int] = None,
+        specialization: Optional[str] = "General IT"
+    ) -> User:
+        """Register a new user account and simultaneously create their associated profile (Employee or Agent)."""
+        with db.get_session() as session:
+            # Check unique constraints
+            existing = session.query(User).filter(
+                (User.username == username) | (User.email == email)
+            ).first()
+            if existing:
+                raise UserAlreadyExistsError(username if existing.username == username else email)
+
+            hashed_pw = PasswordService.hash_password(plain_password)
+            user = User(
+                username=username,
+                email=email,
+                password_hash=hashed_pw,
+                role=role,
+                is_active=True
+            )
+            session.add(user)
+            session.flush()
+
+            # Create associated profile
+            if role == "Employee":
+                if not department_id:
+                    # Default to first department if not supplied
+                    first_dept = session.query(Department).first()
+                    department_id = first_dept.department_id if first_dept else 1
+
+                emp = Employee(
+                    user_id=user.user_id,
+                    department_id=department_id,
+                    full_name=full_name or username,
+                    phone=phone,
+                    job_title=job_title or "Staff Member"
+                )
+                session.add(emp)
+            elif role in ("Support Agent", "Team Lead"):
+                if not team_id:
+                    first_team = session.query(SupportTeam).first()
+                    team_id = first_team.team_id if first_team else 1
+
+                agent = SupportAgent(
+                    user_id=user.user_id,
+                    team_id=team_id,
+                    full_name=full_name or username,
+                    specialization=specialization or "General IT",
+                    is_available=True
+                )
+                session.add(agent)
+
+            session.flush()
+            session.refresh(user)
+            if user.employee:
+                _ = user.employee.department
+            if user.agent:
+                _ = user.agent.team
+            log_audit("USER_REGISTERED", username, f"Role: {role}, Full Name: {full_name or username}")
+            return user
+
 
 
 class SessionManager:
