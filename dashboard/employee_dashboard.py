@@ -147,21 +147,54 @@ def render_employee_dashboard():
                         if t.resolution_deadline:
                             st.caption(f"**Target SLA:** {t.resolution_deadline.strftime('%Y-%m-%d %H:%M')}")
 
-                    # Resolution info if available
+                    # Resolution info & actions
                     if t.resolution:
-                        st.success(f"**Resolution Note:** {t.resolution.resolution_steps}\n\n*Root Cause:* {t.resolution.root_cause}")
+                        st.markdown(f"""
+                        <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 16px; margin: 12px 0;">
+                            <div style="color: #166534; font-weight: 600; font-size: 0.9rem;">✅ Resolution Provided by Support</div>
+                            <div style="color: #1E293B; font-size: 0.88rem; margin-top: 4px;"><strong>Solution:</strong> {t.resolution.resolution_steps}</div>
+                            <div style="color: #475569; font-size: 0.8rem; margin-top: 2px;"><em>Root Cause: {t.resolution.root_cause} (Category: {t.resolution.resolution_category})</em></div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                    # Option to reopen if resolved
-                    if t.status in ("RESOLVED", "CLOSED"):
-                        st.markdown("---")
-                        reopen_comment = st.text_input("Reopen Reason (if problem persists):", key=f"reopen_text_{t.ticket_id}")
-                        if st.button("🔄 Reopen Ticket", key=f"reopen_btn_{t.ticket_id}"):
-                            if reopen_comment.strip():
-                                ticket_repo.update_status(t.ticket_id, "REOPENED", user_id=user.user_id, comment=reopen_comment)
-                                st.success("Ticket has been reopened!")
-                                st.rerun()
-                            else:
-                                st.warning("Please enter a reason before reopening.")
+                    if t.status == "RESOLVED":
+                        st.markdown("##### 📌 Verify Resolution & Close")
+                        col_act1, col_act2 = st.columns(2)
+                        
+                        with col_act1:
+                            with st.form(key=f"close_form_{t.ticket_id}"):
+                                st.markdown("###### ✅ Everything working? Close Ticket")
+                                rating = st.selectbox("How was your support experience?", ["⭐⭐⭐⭐⭐ Excellent", "⭐⭐⭐⭐ Good", "⭐⭐⭐ Satisfactory", "⭐⭐ Needs Improvement", "⭐ Poor"], key=f"csat_rate_{t.ticket_id}")
+                                close_note = st.text_input("Feedback / Closing Note (Optional)", placeholder="Thanks for the quick help!", key=f"csat_note_{t.ticket_id}")
+                                if st.form_submit_button("🔒 Confirm & Close Ticket", type="primary", use_container_width=True):
+                                    comment_msg = f"Closed by requester with rating: {rating}. Feedback: {close_note.strip()}" if close_note.strip() else f"Closed by requester with rating: {rating}"
+                                    ticket_repo.update_status(t.ticket_id, "CLOSED", user_id=user.user_id, comment=comment_msg)
+                                    st.success("🎉 Ticket closed! Thank you for your feedback.")
+                                    st.rerun()
+
+                        with col_act2:
+                            with st.form(key=f"reopen_form_{t.ticket_id}"):
+                                st.markdown("###### ⚠️ Still facing the issue?")
+                                reopen_comment = st.text_input("Reason for Reopening *", placeholder="e.g. Issue reoccurred after reboot", key=f"reopen_text_{t.ticket_id}")
+                                if st.form_submit_button("🔄 Reopen Ticket", use_container_width=True):
+                                    if reopen_comment.strip():
+                                        ticket_repo.update_status(t.ticket_id, "REOPENED", user_id=user.user_id, comment=reopen_comment.strip())
+                                        st.success("Ticket has been reopened and returned to the support queue.")
+                                        st.rerun()
+                                    else:
+                                        st.error("Please enter a reason before reopening.")
+
+                    elif t.status == "CLOSED":
+                        st.caption("🔒 This ticket has been completed and closed.")
+                        with st.expander("Need to reopen this closed ticket?"):
+                            reopen_comment_closed = st.text_input("Reason for reopening:", key=f"reopen_closed_txt_{t.ticket_id}")
+                            if st.button("🔄 Reopen Closed Ticket", key=f"reopen_closed_btn_{t.ticket_id}"):
+                                if reopen_comment_closed.strip():
+                                    ticket_repo.update_status(t.ticket_id, "REOPENED", user_id=user.user_id, comment=reopen_comment_closed.strip())
+                                    st.success("Ticket has been reopened.")
+                                    st.rerun()
+                                else:
+                                    st.warning("Please provide a reason.")
 
                     # Comments thread
                     st.markdown("##### 💬 Conversation & Updates")
@@ -172,10 +205,10 @@ def render_employee_dashboard():
                                 author = c.user.username if c.user else "User"
                                 st.markdown(f"""
                                 <div class="comment-bubble">
-                                    <div style="font-size:0.75rem; color:#94A3B8; margin-bottom:4px;">
+                                    <div style="font-size:0.75rem; color:#64748B; margin-bottom:4px;">
                                         <strong>{author}</strong> • {c.created_at.strftime('%b %d, %H:%M')}
                                     </div>
-                                    <div style="font-size:0.9rem;">{c.comment_text}</div>
+                                    <div style="font-size:0.88rem;">{c.comment_text}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
                     else:

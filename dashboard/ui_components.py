@@ -3,7 +3,7 @@
 import streamlit as st
 
 def apply_custom_styles():
-    """Inject custom modern CSS for typography, cards, badges, and layout aesthetics."""
+    """Inject custom modern CSS for typography, cards, badges, and layout aesthetics in light mode."""
     custom_css = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -12,102 +12,105 @@ def apply_custom_styles():
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* Metric Card Styling */
+    /* Metric Card Styling (Clean Light Mode) */
     .metric-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 20px 22px;
-        margin-bottom: 16px;
-        box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(10px);
-        transition: transform 0.2s ease, border-color 0.2s ease;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
     .metric-card:hover {
         transform: translateY(-2px);
-        border-color: rgba(99, 102, 241, 0.4);
+        border-color: #6366F1;
+        box-shadow: 0 8px 16px -4px rgba(99, 102, 241, 0.12);
     }
     .metric-title {
-        font-size: 0.84rem;
-        font-weight: 500;
+        font-size: 0.8rem;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #94A3B8;
-        margin-bottom: 8px;
+        letter-spacing: 0.05em;
+        color: #64748B;
+        margin-bottom: 6px;
     }
     .metric-value {
-        font-size: 2rem;
+        font-size: 1.85rem;
         font-weight: 700;
-        color: #F8FAFC;
+        color: #0F172A;
         line-height: 1.1;
     }
     .metric-sub {
-        font-size: 0.8rem;
-        color: #64748B;
-        margin-top: 6px;
+        font-size: 0.78rem;
+        color: #94A3B8;
+        margin-top: 5px;
     }
 
-    /* Badges */
+    /* Badges (Crisp Light Theme) */
     .badge {
         display: inline-block;
-        padding: 4px 10px;
+        padding: 3px 9px;
         border-radius: 9999px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 600;
         letter-spacing: 0.03em;
         text-transform: uppercase;
     }
-    .badge-open { background-color: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .badge-assigned { background-color: rgba(168, 85, 247, 0.2); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .badge-in-progress { background-color: rgba(234, 179, 8, 0.2); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.3); }
-    .badge-resolved { background-color: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.3); }
-    .badge-closed { background-color: rgba(100, 116, 139, 0.2); color: #94A3B8; border: 1px solid rgba(100, 116, 139, 0.3); }
-    .badge-reopened { background-color: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-open { background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+    .badge-assigned { background-color: #FAF5FF; color: #9333EA; border: 1px solid #E9D5FF; }
+    .badge-in-progress { background-color: #FEFCE8; color: #CA8A04; border: 1px solid #FEF08A; }
+    .badge-resolved { background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+    .badge-closed { background-color: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+    .badge-reopened { background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
 
-    .badge-critical { background-color: rgba(225, 29, 72, 0.2); color: #FB7185; border: 1px solid rgba(225, 29, 72, 0.4); }
-    .badge-high { background-color: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); }
-    .badge-medium { background-color: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
-    .badge-low { background-color: rgba(74, 222, 128, 0.2); color: #86EFAC; border: 1px solid rgba(74, 222, 128, 0.4); }
+    .badge-critical { background-color: #FFF1F2; color: #E11D48; border: 1px solid #FFE4E6; }
+    .badge-high { background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }
+    .badge-medium { background-color: #EFF6FF; color: #2563EB; border: 1px solid #DBEAFE; }
+    .badge-low { background-color: #F0FDF4; color: #16A34A; border: 1px solid #DCFCE7; }
 
     /* Timeline and audit styles */
     .timeline-item {
-        border-left: 2px solid #334155;
-        padding-left: 16px;
-        margin-left: 8px;
-        margin-bottom: 14px;
+        border-left: 2px solid #CBD5E1;
+        padding-left: 14px;
+        margin-left: 6px;
+        margin-bottom: 12px;
         position: relative;
     }
     .timeline-item::before {
         content: '';
         position: absolute;
-        left: -6px;
-        top: 2px;
-        width: 10px;
-        height: 10px;
+        left: -5px;
+        top: 3px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         background-color: #6366F1;
     }
     .timeline-date {
-        font-size: 0.75rem;
+        font-size: 0.74rem;
         color: #64748B;
     }
     .timeline-text {
-        font-size: 0.88rem;
-        color: #E2E8F0;
+        font-size: 0.86rem;
+        color: #1E293B;
         margin-top: 2px;
     }
 
     /* Comment bubbles */
     .comment-bubble {
-        background: #1E293B;
-        border-radius: 10px;
-        padding: 12px 16px;
-        margin-bottom: 10px;
+        background: #F8FAFC;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        border: 1px solid #E2E8F0;
         border-left: 3px solid #6366F1;
+        color: #1E293B;
     }
     .comment-bubble.internal {
         border-left-color: #F59E0B;
-        background: rgba(245, 158, 11, 0.08);
+        background: #FFFBEB;
+        border-color: #FEF3C7;
     }
     </style>
     """

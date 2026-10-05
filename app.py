@@ -30,8 +30,8 @@ def render_login_page():
     with col2:
         st.markdown(
             f"<div style='text-align: center; margin-bottom: 25px;'>"
-            f"<h1 style='color: #6366F1;'>🎫 {config.APP_TITLE}</h1>"
-            f"<p style='color: #94A3B8;'>Enterprise Issue Tracking, SLA Management & SQL Intelligence</p>"
+            f"<h1 style='color: #4F46E5;'>🎫 {config.APP_TITLE}</h1>"
+            f"<p style='color: #64748B;'>Enterprise Issue Tracking, SLA Management & SQL Intelligence</p>"
             f"</div>",
             unsafe_allow_html=True
         )

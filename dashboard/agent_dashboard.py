@@ -118,20 +118,20 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
     act_col1, act_col2, act_col3 = st.columns(3)
 
     with act_col1:
-        if t.status == "ASSIGNED":
-            if st.button("▶️ Start Progress", key=f"{prefix}_start_{t.ticket_id}", use_container_width=True):
+        if t.status in ("ASSIGNED", "OPEN"):
+            if st.button("▶️ Start Progress", key=f"{prefix}_start_{t.ticket_id}", use_container_width=True, type="primary"):
                 ticket_repo.update_status(t.ticket_id, "IN PROGRESS", user_id=user.user_id)
                 st.rerun()
 
     with act_col2:
         if t.status in ("IN PROGRESS", "REOPENED", "ASSIGNED"):
             # Resolve trigger
-            with st.popover("✅ Resolve Ticket"):
+            with st.popover("✅ Resolve Ticket", use_container_width=True):
                 st.markdown(f"**Resolve #{t.ticket_number}**")
-                root_cause = st.text_input("Root Cause", placeholder="e.g. DNS cache stale / Expired cert", key=f"{prefix}_rc_{t.ticket_id}")
-                steps = st.text_area("Resolution Steps Taken", placeholder="Detailed steps applied...", key=f"{prefix}_step_{t.ticket_id}")
+                root_cause = st.text_input("Root Cause *", placeholder="e.g. DNS cache stale / Expired cert", key=f"{prefix}_rc_{t.ticket_id}")
+                steps = st.text_area("Resolution Steps Taken *", placeholder="Detailed steps applied to solve...", key=f"{prefix}_step_{t.ticket_id}")
                 cat = st.selectbox("Resolution Category", ["Technical Fix", "User Configuration", "Hardware Replacement", "Access Granted", "Workaround"], key=f"{prefix}_rescat_{t.ticket_id}")
-                if st.button("Submit Resolution", key=f"{prefix}_btn_res_{t.ticket_id}", type="primary"):
+                if st.button("Submit Resolution", key=f"{prefix}_btn_res_{t.ticket_id}", type="primary", use_container_width=True):
                     if root_cause.strip() and steps.strip():
                         ticket_repo.resolve_ticket(
                             ticket_id=t.ticket_id,
@@ -147,10 +147,25 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
                         st.error("Root cause and resolution steps are required.")
 
     with act_col3:
-        if t.status == "RESOLVED":
-            if st.button("🔒 Close Ticket", key=f"{prefix}_close_{t.ticket_id}", use_container_width=True):
-                ticket_repo.update_status(t.ticket_id, "CLOSED", user_id=user.user_id, comment="Closed by support agent.")
-                st.rerun()
+        # Reassign or Close
+        if user.role in ("Team Lead", "Admin") or (agent and t.assigned_agent_id == agent.agent_id):
+            with st.popover("🔄 Reassign Ticket", use_container_width=True):
+                all_agents = agent_repo.get_all()
+                agent_dict = {f"{a.full_name} ({a.team.name if a.team else 'General'})": a.agent_id for a in all_agents}
+                chosen_agent_label = st.selectbox("Assign to Agent", list(agent_dict.keys()), key=f"{prefix}_reassign_sel_{t.ticket_id}")
+                chosen_agent_id = agent_dict[chosen_agent_label]
+                reassign_note = st.text_input("Reassignment Reason", placeholder="Specialist required...", key=f"{prefix}_reassign_note_{t.ticket_id}")
+                if st.button("Confirm Reassignment", key=f"{prefix}_reassign_btn_{t.ticket_id}", type="primary", use_container_width=True):
+                    chosen_agent = next(a for a in all_agents if a.agent_id == chosen_agent_id)
+                    ticket_repo.assign_ticket(
+                        ticket_id=t.ticket_id,
+                        agent_id=chosen_agent_id,
+                        team_id=chosen_agent.team_id,
+                        user_id=user.user_id,
+                        comment=f"Reassigned to {chosen_agent.full_name}: {reassign_note.strip()}" if reassign_note.strip() else f"Reassigned to {chosen_agent.full_name}"
+                    )
+                    st.success(f"Reassigned #{t.ticket_number} to {chosen_agent.full_name}!")
+                    st.rerun()
 
     # Communication & History
     c_tab1, c_tab2 = st.tabs(["💬 Messages & Internal Notes", "📜 Audit Trail"])
@@ -160,21 +175,21 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
         if full_ticket and full_ticket.comments:
             for c in full_ticket.comments:
                 is_int = c.is_internal
-                badge_type = "<span style='color:#F59E0B;'>[INTERNAL NOTE]</span>" if is_int else ""
+                badge_type = "<span style='color:#D97706; font-weight:600;'>[INTERNAL NOTE]</span>" if is_int else ""
                 author = c.user.username if c.user else "System"
                 st.markdown(f"""
                 <div class="comment-bubble {'internal' if is_int else ''}">
-                    <div style="font-size:0.75rem; color:#94A3B8;"><strong>{author}</strong> {badge_type} • {c.created_at.strftime('%b %d, %H:%M')}</div>
-                    <div style="font-size:0.88rem; margin-top:4px;">{c.comment_text}</div>
+                    <div style="font-size:0.75rem; color:#64748B;"><strong>{author}</strong> {badge_type} • {c.created_at.strftime('%b %d, %H:%M')}</div>
+                    <div style="font-size:0.88rem; margin-top:4px; color:#1E293B;">{c.comment_text}</div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
             st.caption("No comments posted.")
 
         with st.form(key=f"{prefix}_agent_comment_form_{t.ticket_id}", clear_on_submit=True):
-            reply_text = st.text_area("Write message or internal note...", height=60, key=f"{prefix}_reply_txt_{t.ticket_id}")
+            reply_text = st.text_area("Write public message or internal note...", height=60, key=f"{prefix}_reply_txt_{t.ticket_id}")
             is_internal = st.checkbox("🔒 Internal Note (Only visible to IT Staff)", value=False, key=f"{prefix}_chk_int_{t.ticket_id}")
-            if st.form_submit_button("Send Response"):
+            if st.form_submit_button("Send Response", use_container_width=True):
                 if reply_text.strip():
                     ticket_repo.add_comment(t.ticket_id, user.user_id, reply_text.strip(), is_internal=is_internal)
                     st.rerun()
@@ -188,6 +203,6 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
                 <div class="timeline-item">
                     <div class="timeline-date">{h.changed_at.strftime('%Y-%m-%d %H:%M:%S')} by <strong>{changer}</strong></div>
                     <div class="timeline-text">Status: <code>{h.old_status or 'NEW'}</code> ➔ <code>{h.new_status}</code></div>
-                    {f'<div style="font-size:0.8rem; color:#94A3B8;">{h.comment}</div>' if h.comment else ''}
+                    {f'<div style="font-size:0.8rem; color:#64748B;">{h.comment}</div>' if h.comment else ''}
                 </div>
                 """, unsafe_allow_html=True)
