@@ -188,13 +188,15 @@ def main():
         st.markdown(f'<span class="badge {badge_cls}">{current_user.role}</span>', unsafe_allow_html=True)
         st.divider()
 
-        # Dynamic navigation options based on role
+        # Strict Role-Based Navigation
         if current_user.role == "Admin":
-            nav_options = ["📊 Executive Analytics", "🎧 Support Workspace", "👤 Employee Portal"]
-        elif current_user.role in ("Team Lead", "Support Agent"):
-            nav_options = ["🎧 Support Workspace", "👤 Raise/View My Tickets", "📊 Operational Overview"]
-        else:
-            nav_options = ["👤 Employee Portal"]
+            nav_options = ["📊 Executive Analytics & BI", "🎧 Support Operations Queue", "👤 Employee Portal (Simulator)"]
+        elif current_user.role == "Team Lead":
+            nav_options = ["🎧 Support Desk Operations", "📊 Operational Overview"]
+        elif current_user.role == "Support Agent":
+            nav_options = ["🎧 Support Desk Operations"]
+        else:  # Employee
+            nav_options = ["👤 Employee Helpdesk Portal"]
 
         selected_page = st.radio("Navigation", nav_options)
 
@@ -203,10 +205,10 @@ def main():
             SessionManager.logout()
             st.rerun()
 
-    # Route to appropriate view
-    if selected_page in ("📊 Executive Analytics", "📊 Operational Overview"):
+    # Route strictly to appropriate view
+    if selected_page in ("📊 Executive Analytics & BI", "📊 Operational Overview"):
         render_admin_dashboard()
-    elif selected_page == "🎧 Support Workspace":
+    elif selected_page in ("🎧 Support Operations Queue", "🎧 Support Desk Operations"):
         render_agent_dashboard()
     else:
         render_employee_dashboard()

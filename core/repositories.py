@@ -251,6 +251,17 @@ class AgentRepository(BaseRepository):
             if not self._external_session:
                 session.close()
 
+    def update_availability(self, agent_id: int, is_available: bool) -> bool:
+        """Update active availability status for an agent."""
+        with db.get_session() as session:
+            agent = session.query(SupportAgent).filter(SupportAgent.agent_id == agent_id).first()
+            if agent:
+                agent.is_available = is_available
+                session.flush()
+                log_audit("AGENT_AVAILABILITY_CHANGED", str(agent.full_name), f"Available: {is_available}")
+                return True
+            return False
+
 
 class TicketRepository(BaseRepository):
     """Ticket operations repository with full CRUD, SLA calculations and filtering."""

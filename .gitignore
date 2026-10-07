@@ -16,12 +16,15 @@ env/
 # Environment variables & secrets
 .env
 
-# Application logs
+# Application logs & user uploads
 logs/*.log
 !logs/.gitkeep
+uploads/
+it-helpdesk/
 
 # IDE & OS files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
