@@ -37,8 +37,39 @@ class DepartmentAnalytics:
         if df.empty:
             df = self.query_mgr.call_procedure_df("get_department_summary")
 
+        if df.empty:
+            from core.database import db
+            from core.models import Department, Ticket
+            try:
+                with db.get_session() as session:
+                    depts = session.query(Department).all()
+                    data = []
+                    for d in depts:
+                        d_tickets = d.tickets or []
+                        total = len(d_tickets)
+                        resolved = sum(1 for t in d_tickets if t.status in ("RESOLVED", "CLOSED"))
+                        backlog = total - resolved
+                        critical = sum(1 for t in d_tickets if t.priority == "Critical")
+                        breached = sum(1 for t in d_tickets if t.is_breached())
+                        comp = round(((total - breached) / total * 100), 1) if total > 0 else 100.0
+                        durations = [(t.resolved_at - t.created_at).total_seconds() / 3600.0 for t in d_tickets if t.resolved_at and t.created_at]
+                        avg_res = round(sum(durations) / len(durations), 2) if durations else 0.0
+                        data.append({
+                            "department_id": d.department_id,
+                            "department_name": d.name,
+                            "department_code": d.code,
+                            "total_tickets": total,
+                            "active_backlog": backlog,
+                            "resolved_count": resolved,
+                            "critical_count": critical,
+                            "avg_resolution_hours": avg_res,
+                            "sla_compliance_pct": comp
+                        })
+                    df = pd.DataFrame(data)
+            except Exception:
+                df = pd.DataFrame()
+
         if not df.empty and "department_health_status" not in df.columns:
-            # Assign health status based on compliance and backlog
             def compute_health(row):
                 compliance = row.get("sla_compliance_pct")
                 if pd.notnull(compliance) and float(compliance) < 75.0:

@@ -10,7 +10,8 @@ from core.logger import log_error
 from dashboard.ui_components import render_kpi_card, get_status_badge, get_priority_badge, get_sla_status_badge
 from dashboard.charts import (
     create_status_donut, create_priority_chart, create_department_bar,
-    create_sla_compliance_gauge, create_agent_performance_bar, create_category_bar
+    create_sla_compliance_gauge, create_agent_performance_bar, create_category_bar,
+    create_csat_gauge, create_csat_breakdown_bar
 )
 from analytics.reports import ReportGenerator
 from analytics.sql_queries import (
@@ -57,6 +58,8 @@ def render_admin_dashboard():
             "status": t.status,
             "agent": t.assigned_agent.full_name if t.assigned_agent else "Unassigned",
             "is_breached": t.is_breached(),
+            "csat_rating": t.csat_rating,
+            "csat_feedback": t.csat_feedback,
             "created_at": t.created_at,
             "resolved_at": t.resolved_at,
             "resolution_deadline": t.resolution_deadline,
@@ -64,7 +67,7 @@ def render_admin_dashboard():
         })
 
     df = pd.DataFrame(ticket_data) if ticket_data else pd.DataFrame(columns=[
-        "ticket_id", "ticket_number", "title", "department", "category", "priority", "status", "agent", "is_breached", "created_at", "resolved_at"
+        "ticket_id", "ticket_number", "title", "department", "category", "priority", "status", "agent", "is_breached", "csat_rating", "csat_feedback", "created_at", "resolved_at"
     ])
 
     unassigned_count = len(df[df["agent"] == "Unassigned"]) if not df.empty else 0
@@ -100,6 +103,10 @@ def render_admin_dashboard():
     else:
         avg_res_hours = 0.0
 
+    # Calculate system CSAT
+    rated_tickets = df[df["csat_rating"].notnull()] if not df.empty and "csat_rating" in df.columns else pd.DataFrame()
+    avg_csat = round(rated_tickets["csat_rating"].mean(), 1) if not rated_tickets.empty else 5.0
+
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     with kpi1:
         render_kpi_card("Total Tickets", str(total_tickets), "System-wide", "📈")
@@ -110,7 +117,7 @@ def render_admin_dashboard():
     with kpi4:
         render_kpi_card("SLA Compliance", f"{compliance_pct}%", f"{breached_tickets} breaches", "🎯")
     with kpi5:
-        render_kpi_card("Critical Issues", str(len(df[df['priority'] == 'Critical']) if not df.empty else 0), "P1 Incidents", "🚨")
+        render_kpi_card("CSAT Quality", f"⭐ {avg_csat} / 5.0", f"{len(rated_tickets)} user ratings", "🌟")
 
     st.divider()
 
@@ -136,6 +143,14 @@ def render_admin_dashboard():
         with col_c4:
             st.plotly_chart(create_category_bar(df), use_container_width=True)
 
+        # CSAT Quality Intelligence Section
+        st.markdown("##### ⭐ Customer Satisfaction (CSAT) Quality Analytics")
+        col_csat1, col_csat2 = st.columns([1, 2])
+        with col_csat1:
+            st.plotly_chart(create_csat_gauge(avg_csat), use_container_width=True)
+        with col_csat2:
+            st.plotly_chart(create_csat_breakdown_bar(df), use_container_width=True)
+
     with tab_agents:
         st.markdown("#### 🏆 Support Team & Agent Rankings")
         agents = agent_repo.get_all()
@@ -148,6 +163,10 @@ def render_admin_dashboard():
             a_active = a_total - a_resolved
             a_breaches = len(a_tickets[a_tickets["is_breached"] == True]) if not a_tickets.empty else 0
             a_comp = round(((a_total - a_breaches) / a_total * 100), 1) if a_total > 0 else 100.0
+            
+            # Agent CSAT
+            a_csat_subset = a_tickets[a_tickets["csat_rating"].notnull()] if not a_tickets.empty else pd.DataFrame()
+            a_csat_score = round(a_csat_subset["csat_rating"].mean(), 1) if not a_csat_subset.empty else 5.0
 
             agent_metrics.append({
                 "agent_name": a.full_name,
@@ -157,6 +176,7 @@ def render_admin_dashboard():
                 "resolved_tickets": a_resolved,
                 "active_tickets": a_active,
                 "sla_compliance_pct": f"{a_comp}%",
+                "csat_score": f"⭐ {a_csat_score}/5.0 ({len(a_csat_subset)})",
                 "status": "Available" if a.is_available else "Busy"
             })
 
@@ -173,6 +193,7 @@ def render_admin_dashboard():
                     "resolved_tickets": "Resolved",
                     "active_tickets": "Active Queue",
                     "sla_compliance_pct": "SLA %",
+                    "csat_score": "CSAT Quality",
                     "status": "Availability"
                 }),
                 use_container_width=True,

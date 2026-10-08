@@ -51,8 +51,21 @@ class TicketManager:
     def _generate_ticket_number(self, session: Session) -> str:
         """Generate unique ticket identifier: TCK-YYYY-XXXX."""
         year = datetime.utcnow().year
+        prefix = f"TCK-{year}-"
+        latest_ticket = (
+            session.query(Ticket.ticket_number)
+            .filter(Ticket.ticket_number.like(f"{prefix}%"))
+            .order_by(Ticket.ticket_number.desc())
+            .first()
+        )
+        if latest_ticket and latest_ticket[0]:
+            try:
+                last_seq = int(latest_ticket[0].split("-")[-1])
+                return f"{prefix}{last_seq + 1:04d}"
+            except (ValueError, IndexError):
+                pass
         count = session.query(func.count(Ticket.ticket_id)).scalar() or 0
-        return f"TCK-{year}-{count + 1:04d}"
+        return f"{prefix}{count + 1:04d}"
 
     def create_ticket(
         self,

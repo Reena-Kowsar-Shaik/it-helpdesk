@@ -8,7 +8,7 @@ from sqlalchemy import func, desc, or_, and_
 from core.database import db
 from core.models import (
     User, Employee, SupportAgent, SupportTeam, Department, 
-    Category, SLARule, Ticket, TicketHistory, Comment, TicketResolution
+    Category, SLARule, Ticket, TicketHistory, Comment, TicketResolution, KnowledgeArticle
 )
 from core.exceptions import (
     TicketNotFoundError, EntityNotFoundError, UserAlreadyExistsError, ValidationError
@@ -269,8 +269,21 @@ class TicketRepository(BaseRepository):
     def _generate_ticket_number(self, session: Session) -> str:
         """Generate unique ticket identifier format: TCK-YYYY-XXXX."""
         year = datetime.utcnow().year
+        prefix = f"TCK-{year}-"
+        latest_ticket = (
+            session.query(Ticket.ticket_number)
+            .filter(Ticket.ticket_number.like(f"{prefix}%"))
+            .order_by(Ticket.ticket_number.desc())
+            .first()
+        )
+        if latest_ticket and latest_ticket[0]:
+            try:
+                last_seq = int(latest_ticket[0].split("-")[-1])
+                return f"{prefix}{last_seq + 1:04d}"
+            except (ValueError, IndexError):
+                pass
         count = session.query(func.count(Ticket.ticket_id)).scalar() or 0
-        return f"TCK-{year}-{count + 1:04d}"
+        return f"{prefix}{count + 1:04d}"
 
     def create_ticket(
         self,
@@ -545,3 +558,66 @@ class TicketRepository(BaseRepository):
 
             log_audit("TICKET_RESOLVED", f"User {user_id}", f"Ticket #{ticket.ticket_number}")
             return resolution
+
+    def submit_csat(self, ticket_id: int, rating: int, feedback: Optional[str] = None, user_id: Optional[int] = None) -> bool:
+        """Submit Customer Satisfaction (CSAT) rating (1-5) and feedback."""
+        with db.get_session() as session:
+            ticket = session.query(Ticket).filter(Ticket.ticket_id == ticket_id).first()
+            if not ticket:
+                raise TicketNotFoundError(ticket_id)
+            ticket.csat_rating = max(1, min(5, rating))
+            ticket.csat_feedback = feedback.strip() if feedback else None
+            log_audit("CSAT_SUBMITTED", f"User {user_id}", f"Ticket #{ticket.ticket_number}: {ticket.csat_rating} Stars")
+            return True
+
+
+class KnowledgeRepository(BaseRepository):
+    """Knowledge base articles repository for self-service help & ticket deflection."""
+
+    def get_all(self) -> List[KnowledgeArticle]:
+        """Fetch all knowledge base articles with their categories."""
+        with db.get_session() as session:
+            return session.query(KnowledgeArticle).options(joinedload(KnowledgeArticle.category)).all()
+
+    def get_by_id(self, article_id: int) -> Optional[KnowledgeArticle]:
+        """Fetch article by ID."""
+        with db.get_session() as session:
+            return session.query(KnowledgeArticle).options(joinedload(KnowledgeArticle.category)).filter(KnowledgeArticle.article_id == article_id).first()
+
+    def get_by_category(self, category_id: int) -> List[KnowledgeArticle]:
+        """Fetch articles for a specific category."""
+        with db.get_session() as session:
+            return session.query(KnowledgeArticle).filter(KnowledgeArticle.category_id == category_id).all()
+
+    def search_articles(self, query: str) -> List[KnowledgeArticle]:
+        """Search knowledge articles by title, content, or tags."""
+        if not query or not query.strip():
+            return self.get_all()
+        q_term = f"%{query.strip().lower()}%"
+        with db.get_session() as session:
+            return session.query(KnowledgeArticle).options(joinedload(KnowledgeArticle.category)).filter(
+                or_(
+                    func.lower(KnowledgeArticle.title).like(q_term),
+                    func.lower(KnowledgeArticle.content).like(q_term),
+                    func.lower(KnowledgeArticle.tags).like(q_term)
+                )
+            ).all()
+
+    def mark_helpful(self, article_id: int) -> int:
+        """Increment helpful count for an article."""
+        with db.get_session() as session:
+            art = session.query(KnowledgeArticle).filter(KnowledgeArticle.article_id == article_id).first()
+            if art:
+                art.helpful_count = (art.helpful_count or 0) + 1
+                return art.helpful_count
+            return 0
+
+    def increment_view(self, article_id: int) -> int:
+        """Increment view count for an article."""
+        with db.get_session() as session:
+            art = session.query(KnowledgeArticle).filter(KnowledgeArticle.article_id == article_id).first()
+            if art:
+                art.views_count = (art.views_count or 0) + 1
+                return art.views_count
+            return 0
+

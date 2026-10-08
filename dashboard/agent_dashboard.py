@@ -45,8 +45,12 @@ def render_agent_dashboard():
     unassigned_tickets = [t for t in all_tickets if t.assigned_agent_id is None and t.status in ("OPEN", "ASSIGNED", "REOPENED")]
     unassigned_count = len(unassigned_tickets)
     breached = sum(1 for t in my_tickets if t.is_breached() and t.status not in ("RESOLVED", "CLOSED"))
+    
+    # Calculate CSAT for agent
+    agent_csat_ratings = [t.csat_rating for t in my_tickets if t.csat_rating is not None]
+    avg_csat = round(sum(agent_csat_ratings) / len(agent_csat_ratings), 1) if agent_csat_ratings else 5.0
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         render_kpi_card("Active Assigned", str(my_active), "Requires attention", "⚡")
     with col2:
@@ -55,6 +59,8 @@ def render_agent_dashboard():
         render_kpi_card("SLA Breaches", str(breached), "Overdue resolution", "🚨")
     with col4:
         render_kpi_card("Resolved by Me", str(my_resolved), "Completed tickets", "🏆")
+    with col5:
+        render_kpi_card("CSAT Rating", f"⭐ {avg_csat} / 5.0", f"{len(agent_csat_ratings)} ratings", "🌟")
 
     st.divider()
 
@@ -215,6 +221,14 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
         st.markdown(f"**Priority:** {get_priority_badge(t.priority)}", unsafe_allow_html=True)
         st.markdown(f"**SLA:** {get_sla_status_badge(t.resolution_deadline, is_res, t.resolved_at)}", unsafe_allow_html=True)
 
+        if t.csat_rating:
+            st.markdown(f"""
+            <div style="background-color: #FEF3C7; border: 1px solid #FDE68A; border-radius: 6px; padding: 6px 10px; margin-top: 6px;">
+                <div style="color: #92400E; font-weight: 600; font-size: 0.8rem;">⭐ Employee Rating: {'⭐' * t.csat_rating} ({t.csat_rating}/5)</div>
+                {f'<div style="font-size: 0.78rem; color: #451A03;">"{t.csat_feedback}"</div>' if t.csat_feedback else ''}
+            </div>
+            """, unsafe_allow_html=True)
+
     # Workflow Actions Box
     st.markdown("##### ⚡ Workflow Actions")
     act_col1, act_col2, act_col3 = st.columns(3)
@@ -289,10 +303,13 @@ def _render_agent_ticket_card(t, user, agent, ticket_repo, agent_repo, prefix="c
         # Canned responses & reply form
         canned_options = [
             "Custom message...",
-            "We are currently investigating your request and analyzing server logs.",
-            "Please restart your device and verify if the problem persists.",
-            "Configuration update deployed. Please test and let us know if issue is resolved.",
-            "Waiting on upstream vendor response. Will update within 2 hours."
+            "🔍 We are currently investigating your request and analyzing server & network logs.",
+            "🛠️ Please collect and attach diagnostic log files from %TEMP% or ~/.logs.",
+            "🔑 Password / MFA token has been reset. Please test your login and verify.",
+            "🔄 Configuration update deployed. Please restart your workstation and verify.",
+            "⚡ Escalated to Tier-3 Infrastructure Engineering for specialized remediation.",
+            "📦 Replacement hardware has been dispatched. Courier tracking will be updated shortly.",
+            "⏳ Waiting for employee confirmation. Please let us know if everything is functioning."
         ]
         chosen_canned = st.selectbox("⚡ Quick Canned Templates", canned_options, key=f"{prefix}_canned_{t.ticket_id}")
         default_val = "" if chosen_canned == "Custom message..." else chosen_canned

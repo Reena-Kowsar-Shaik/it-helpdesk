@@ -186,3 +186,63 @@ def create_category_bar(df: pd.DataFrame) -> go.Figure:
     )
     fig.update_layout(xaxis_title="Tickets", yaxis_title="", **LIGHT_LAYOUT)
     return fig
+
+
+def create_csat_gauge(avg_rating: float) -> go.Figure:
+    """Create a gauge indicator for CSAT customer satisfaction score (out of 5.0)."""
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=avg_rating,
+        number={'suffix': " / 5.0", 'font': {'size': 26, 'color': '#0F172A'}},
+        title={'text': "⭐ Overall CSAT Score", 'font': {'size': 14, 'color': '#334155'}},
+        gauge={
+            'axis': {'range': [0, 5], 'tickwidth': 1, 'tickcolor': "#94A3B8"},
+            'bar': {'color': "#F59E0B"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "#E2E8F0",
+            'steps': [
+                {'range': [0, 2.5], 'color': '#FEE2E2'},
+                {'range': [2.5, 4.0], 'color': '#FEF3C7'},
+                {'range': [4.0, 5.0], 'color': '#DCFCE7'}
+            ],
+            'threshold': {
+                'line': {'color': "#16A34A", 'width': 4},
+                'thickness': 0.75,
+                'value': 4.5
+            }
+        }
+    ))
+    fig.update_layout(height=220, **LIGHT_LAYOUT)
+    return fig
+
+
+def create_csat_breakdown_bar(df: pd.DataFrame) -> go.Figure:
+    """Create a bar chart showing distribution of 1 to 5 star ratings."""
+    if df.empty or "csat_rating" not in df.columns:
+        fig = go.Figure()
+        fig.update_layout(title="No CSAT feedback data", **LIGHT_LAYOUT)
+        return fig
+
+    valid_ratings = df[df["csat_rating"].notnull()]["csat_rating"].astype(int)
+    if valid_ratings.empty:
+        fig = go.Figure()
+        fig.update_layout(title="No ratings received yet", **LIGHT_LAYOUT)
+        return fig
+
+    counts = valid_ratings.value_counts().reindex([5, 4, 3, 2, 1], fill_value=0).reset_index()
+    counts.columns = ["Stars", "Count"]
+    counts["Label"] = counts["Stars"].apply(lambda s: f"{s} Stars " + ("⭐" * s))
+
+    fig = px.bar(
+        counts,
+        x="Count",
+        y="Label",
+        orientation="h",
+        color="Stars",
+        color_continuous_scale=["#EF4444", "#F59E0B", "#10B981"],
+        title="Customer Satisfaction Rating Distribution"
+    )
+    fig.update_layout(xaxis_title="Number of Ratings", yaxis_title="", **LIGHT_LAYOUT)
+    return fig
+

@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from core.repositories import (
-    TicketRepository, DepartmentRepository, CategoryRepository, EmployeeRepository
+    TicketRepository, DepartmentRepository, CategoryRepository, EmployeeRepository, KnowledgeRepository
 )
 from core.auth import SessionManager
 from core.logger import log_audit, log_error
@@ -14,15 +14,29 @@ from dashboard.ui_components import (
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".txt", ".log", ".docx", ".xlsx", ".zip", ".csv"}
+MAX_FILE_SIZE_MB = 10
+
 def _save_uploaded_file(uploaded_file) -> str:
-    """Save an uploaded file to the local uploads directory and return its path."""
+    """Save an uploaded file to the local uploads directory with security validation."""
     if uploaded_file is None:
         return ""
+    
+    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        st.error(f"❌ File extension '{file_ext}' is not permitted. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+        return ""
+
+    file_bytes = uploaded_file.getbuffer()
+    if len(file_bytes) > MAX_FILE_SIZE_MB * 1024 * 1024:
+        st.error(f"❌ File exceeds maximum permitted limit of {MAX_FILE_SIZE_MB}MB.")
+        return ""
+
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     clean_name = f"{timestamp}_{uploaded_file.name.replace(' ', '_')}"
     file_path = os.path.join(UPLOAD_DIR, clean_name)
     with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+        f.write(file_bytes)
     return clean_name
 
 def auto_triage_issue(title: str, description: str, category_names: list) -> dict:
@@ -99,28 +113,25 @@ def render_employee_dashboard():
     ticket_repo = TicketRepository()
     dept_repo = DepartmentRepository()
     cat_repo = CategoryRepository()
+    kb_repo = KnowledgeRepository()
 
     employee = emp_repo.get_by_user_id(user.user_id)
     if not employee:
-        if user.role == "Admin":
+        employee = emp_repo.create_or_link_employee(
+            user_id=user.user_id,
+            full_name="System Administrator" if user.role == "Admin" else user.username.replace("_", " ").title(),
+            job_title="IT Administrator" if user.role == "Admin" else (user.role if user.role != "Employee" else "Staff Specialist")
+        )
+
+    # Optional Admin simulation tool in collapsed expander
+    if user.role == "Admin":
+        with st.expander("🛠️ Admin Tools: Simulate Employee Persona", expanded=False):
             all_employees = emp_repo.get_all()
-            st.info("ℹ️ **Admin Mode:** You can submit/view tickets as Administrator or simulate any employee:")
-            sim_options = {"👑 My Admin Account": None}
+            sim_options = {"👑 My Default Account": employee}
             for e in all_employees:
                 sim_options[f"{e.full_name} ({e.department.name})"] = e
-            
-            selected_label = st.selectbox("Active Persona", list(sim_options.keys()), key="admin_emp_sim")
-            if sim_options[selected_label] is not None:
-                employee = sim_options[selected_label]
-            else:
-                employee = emp_repo.create_or_link_employee(user.user_id, full_name="System Administrator", job_title="IT Administrator")
-        else:
-            # Auto-provision employee profile for support agents, team leads, or newly registered users
-            employee = emp_repo.create_or_link_employee(
-                user_id=user.user_id,
-                full_name=user.username.replace("_", " ").title(),
-                job_title=user.role if user.role != "Employee" else "Staff Specialist"
-            )
+            selected_label = st.selectbox("Switch Persona", list(sim_options.keys()), key="admin_emp_sim")
+            employee = sim_options[selected_label]
 
     if not employee:
         st.error("⚠️ Unable to initialize employee profile. Please refresh the page.")
@@ -154,7 +165,7 @@ def render_employee_dashboard():
     st.divider()
 
     # Tabs: My Tickets vs Submit New Ticket vs Self-Service Knowledge Base
-    tab_view, tab_create, tab_kb = st.tabs(["📂 My Tickets", "➕ Raise a New Helpdesk Ticket", "💡 Self-Service Knowledge Base"])
+    tab_view, tab_create, tab_kb = st.tabs(["📂 My Tickets", "➕ Raise a New Helpdesk Ticket", "📚 Knowledge Base & Self-Help"])
 
     with tab_create:
         st.markdown("#### 📝 Submit Support Request")
@@ -175,7 +186,7 @@ def render_employee_dashboard():
             title = st.text_input("Summary / Subject *", placeholder="e.g. VPN connection drops or Outlook error...", key="emp_new_title")
             description = st.text_area("Detailed Problem Description *", placeholder="Include error messages, device hostname or steps to reproduce...", height=110, key="emp_new_desc")
 
-            # Real-time Smart NLP Auto-Triage
+            # Real-time Smart NLP Auto-Triage & Ticket Deflection Suggestions
             triage_info = auto_triage_issue(title, description, cat_names_list)
             
             if triage_info["is_confident"]:
@@ -189,9 +200,19 @@ def render_employee_dashboard():
                 </div>
                 """, unsafe_allow_html=True)
 
+            # Ticket Deflection: Check Knowledge Base for matching self-service solutions
+            if title.strip() or description.strip():
+                deflect_results = kb_repo.search_articles(f"{title} {description}")
+                if deflect_results:
+                    with st.expander(f"💡 **Suggested Self-Help Solutions ({len(deflect_results)} found)** — Solve instantly without waiting:", expanded=True):
+                        for art in deflect_results[:2]:
+                            st.markdown(f"##### 📖 {art.title}")
+                            st.markdown(art.content)
+                            st.caption(f"🏷️ Category: **{art.category.name if art.category else 'General'}** | 👍 {art.helpful_count or 0} found this helpful")
+                            st.divider()
+
             col_a, col_b = st.columns(2)
             with col_a:
-                # Determine default category index based on smart triage
                 default_cat_idx = 0
                 if triage_info["suggested_category"] in cat_names_list:
                     default_cat_idx = cat_names_list.index(triage_info["suggested_category"])
@@ -213,7 +234,8 @@ def render_employee_dashboard():
                         final_desc = description.strip()
                         if uploaded_file:
                             saved_name = _save_uploaded_file(uploaded_file)
-                            final_desc += f"\n\n[📎 Attachment: {saved_name}]"
+                            if saved_name:
+                                final_desc += f"\n\n[📎 Attachment: {saved_name}]"
 
                         new_ticket = ticket_repo.create_ticket(
                             employee_id=employee.employee_id,
@@ -234,35 +256,47 @@ def render_employee_dashboard():
             st.markdown("##### ⏱️ SLA Target Guarantee")
             st.info(sla_hints.get(priority, "Target Response: 2h | Target Resolution: 8h"))
             st.markdown("""
-            **💡 Smart Triage Assistant:**
-            - Category and urgency are automatically analyzed as you type your summary.
-            - Keywords like `VPN`, `Blue screen`, `Password`, `Database`, `Outage` trigger auto-tagging.
+            **💡 Smart Triage & Self-Service:**
+            - Category and urgency are automatically analyzed as you type.
+            - Matching **Knowledge Base articles** are dynamically suggested above to help you resolve issues immediately.
             - You can manually override the category and urgency at any time.
             """)
 
     with tab_kb:
-        st.markdown("#### 💡 Instant Self-Help & Frequently Asked Questions")
-        st.caption("Try these quick steps before raising a ticket:")
+        st.markdown("#### 📚 Enterprise Self-Service Knowledge Base")
+        st.caption("Browse and search verified IT troubleshooting solutions to fix common issues on your own.")
         
-        with st.expander("🔑 Password Reset & MFA Recovery"):
-            st.write("""
-            1. Visit **https://auth.company.internal/reset** on your phone or workstation.
-            2. Enter your corporate email ID and request a 6-digit verification code.
-            3. If your authenticator app is locked, contact the Identity & Access team.
-            """)
+        c_k1, c_k2 = st.columns([3, 2])
+        with c_k1:
+            kb_search = st.text_input("🔍 Search Solutions", placeholder="Search by problem, error code, or keyword...", key="emp_kb_search")
+        with c_k2:
+            all_kb_cats = cat_repo.get_all()
+            cat_filter_list = ["All Categories"] + [c.name for c in all_kb_cats]
+            chosen_kb_cat = st.selectbox("Category Filter", cat_filter_list, key="emp_kb_cat_filter")
 
-        with st.expander("🌐 VPN & Network Disconnection Issues"):
-            st.write("""
-            1. Flush DNS cache via terminal: `ipconfig /flushdns` (Windows) or `dscacheutil -flushcache` (macOS).
-            2. Toggle Wi-Fi off for 10 seconds and reconnect.
-            3. Verify that your GlobalProtect or Cisco AnyConnect client is updated to v5.2+.
-            """)
+        # Fetch articles
+        if chosen_kb_cat != "All Categories":
+            matched_cat = next((c for c in all_kb_cats if c.name == chosen_kb_cat), None)
+            kb_articles = kb_repo.get_by_category(matched_cat.category_id) if matched_cat else kb_repo.get_all()
+            if kb_search.strip():
+                kb_articles = [a for a in kb_articles if kb_search.lower() in a.title.lower() or kb_search.lower() in a.content.lower()]
+        else:
+            kb_articles = kb_repo.search_articles(kb_search)
 
-        with st.expander("💻 Software Installation & License Activation"):
-            st.write("""
-            1. Open Company Software Portal from Start Menu to install pre-approved software.
-            2. For Adobe CC or JetBrains licenses, submit a 'Software & Applications' ticket with manager approval note.
-            """)
+        if not kb_articles:
+            st.info("No knowledge base articles matched your search. You can submit a ticket using the 'Raise a New Helpdesk Ticket' tab.")
+        else:
+            for art in kb_articles:
+                with st.expander(f"📖 **{art.title}**  — *({art.category.name if art.category else 'General'})*", expanded=bool(kb_search.strip())):
+                    st.markdown(art.content)
+                    st.caption(f"🏷️ Tags: `{art.tags or 'General'}` | 👁️ {art.views_count or 0} Views | 👍 {art.helpful_count or 0} Found Helpful")
+                    
+                    vote_col, _ = st.columns([2, 8])
+                    with vote_col:
+                        if st.button("👍 Mark as Helpful", key=f"kb_vote_btn_{art.article_id}"):
+                            new_count = kb_repo.mark_helpful(art.article_id)
+                            st.toast(f"Thank you for your feedback! Helpful count: {new_count}")
+                            st.rerun()
 
     with tab_view:
         st.markdown("#### 📋 Ticket History & Tracking")
@@ -286,14 +320,11 @@ def render_employee_dashboard():
         if not filtered:
             st.info("No matching tickets found.")
         else:
-            # Single-open accordion selector
             ticket_options = {f"#{t.ticket_number} — {t.title} ({t.status})": t.ticket_id for t in filtered}
             
-            # Default to first ticket if not set or invalid
             if "active_emp_ticket_id" not in st.session_state or st.session_state["active_emp_ticket_id"] not in ticket_options.values():
                 st.session_state["active_emp_ticket_id"] = filtered[0].ticket_id
 
-            # Quick selector that automatically opens one ticket and closes all others
             selected_label = st.selectbox(
                 "🎯 Select Ticket to View / Expand:",
                 list(ticket_options.keys()),
@@ -312,7 +343,6 @@ def render_employee_dashboard():
 
                     col_t1, col_t2 = st.columns([2, 1])
                     with col_t1:
-                        # Clean description & render attachment preview
                         desc_text = t.description
                         attach_file = None
                         if "[📎 Attachment: " in desc_text:
@@ -341,7 +371,7 @@ def render_employee_dashboard():
                         if t.resolution_deadline:
                             st.caption(f"**Target SLA:** {t.resolution_deadline.strftime('%Y-%m-%d %H:%M')}")
 
-                    # Resolution info & actions
+                    # Resolution info
                     if t.resolution:
                         st.markdown(f"""
                         <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 16px; margin: 12px 0;">
@@ -351,17 +381,36 @@ def render_employee_dashboard():
                         </div>
                         """, unsafe_allow_html=True)
 
+                    # CSAT Rating Badge if present
+                    if t.csat_rating:
+                        st.markdown(f"""
+                        <div style="background-color: #FEF3C7; border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 12px; margin: 8px 0;">
+                            <span style="color: #B45309; font-weight: 600;">⭐ Customer Satisfaction Rating:</span> 
+                            <span style="color: #D97706; font-size: 1rem;">{'⭐' * t.csat_rating} ({t.csat_rating}/5 Stars)</span>
+                            {f'<div style="font-size: 0.85rem; color: #451A03; margin-top: 2px;"><em>"{t.csat_feedback}"</em></div>' if t.csat_feedback else ''}
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     if t.status == "RESOLVED":
                         st.markdown("##### 📌 Verify Resolution & Close")
                         col_act1, col_act2 = st.columns(2)
                         
                         with col_act1:
                             with st.form(key=f"close_form_{t.ticket_id}"):
-                                st.markdown("###### ✅ Everything working? Close Ticket")
-                                rating = st.selectbox("How was your support experience?", ["⭐⭐⭐⭐⭐ Excellent", "⭐⭐⭐⭐ Good", "⭐⭐⭐ Satisfactory", "⭐⭐ Needs Improvement", "⭐ Poor"], key=f"csat_rate_{t.ticket_id}")
-                                close_note = st.text_input("Feedback / Closing Note (Optional)", placeholder="Thanks for the quick help!", key=f"csat_note_{t.ticket_id}")
+                                st.markdown("###### ✅ Everything working? Close Ticket & Rate")
+                                stars_map = {
+                                    "⭐⭐⭐⭐⭐ 5/5 - Excellent": 5,
+                                    "⭐⭐⭐⭐ 4/5 - Good": 4,
+                                    "⭐⭐⭐ 3/5 - Satisfactory": 3,
+                                    "⭐⭐ 2/5 - Needs Improvement": 2,
+                                    "⭐ 1/5 - Poor": 1
+                                }
+                                selected_rating_label = st.selectbox("How was your support experience?", list(stars_map.keys()), key=f"csat_rate_{t.ticket_id}")
+                                close_note = st.text_input("Feedback / Comments (Optional)", placeholder="Agent was prompt and helpful!", key=f"csat_note_{t.ticket_id}")
                                 if st.form_submit_button("🔒 Confirm & Close Ticket", type="primary", use_container_width=True):
-                                    comment_msg = f"Closed by requester with rating: {rating}. Feedback: {close_note.strip()}" if close_note.strip() else f"Closed by requester with rating: {rating}"
+                                    rating_num = stars_map[selected_rating_label]
+                                    ticket_repo.submit_csat(t.ticket_id, rating_num, close_note.strip() or None, user_id=user.user_id)
+                                    comment_msg = f"Closed by requester with {rating_num}⭐ rating. Feedback: {close_note.strip()}" if close_note.strip() else f"Closed by requester with {rating_num}⭐ rating."
                                     ticket_repo.update_status(t.ticket_id, "CLOSED", user_id=user.user_id, comment=comment_msg)
                                     st.success("🎉 Ticket closed! Thank you for your feedback.")
                                     st.rerun()

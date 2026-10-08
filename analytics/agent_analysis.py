@@ -16,16 +16,46 @@ class AgentAnalytics:
         self.query_mgr = SQLQueryManager()
 
     def get_agent_leaderboard(self) -> pd.DataFrame:
-        """Retrieves agent performance rankings powered by SQL Window Functions (DENSE_RANK).
-
-        Returns:
-            DataFrame containing ranks, agent names, assigned, resolved, active queue,
-            average resolution hours, and SLA compliance percentages.
-        """
+        """Retrieves agent performance rankings powered by SQL Window Functions (DENSE_RANK) or ORM fallback."""
         df = self.query_mgr.run_query_df(QUERY_AGENT_PERFORMANCE_WINDOW)
         if df.empty:
             # Fallback to stored procedure or view
             df = self.query_mgr.call_procedure_df("get_agent_performance", [0])
+
+        if df.empty:
+            # Universal ORM fallback for SQLite and cross-platform compatibility
+            from core.database import db
+            from core.models import SupportAgent, Ticket
+            try:
+                with db.get_session() as session:
+                    agents = session.query(SupportAgent).all()
+                    data = []
+                    for a in agents:
+                        a_tickets = a.assigned_tickets or []
+                        total = len(a_tickets)
+                        resolved = sum(1 for t in a_tickets if t.status in ("RESOLVED", "CLOSED"))
+                        active = total - resolved
+                        breached = sum(1 for t in a_tickets if t.is_breached())
+                        comp_pct = round(((total - breached) / total * 100), 1) if total > 0 else 100.0
+                        durations = [(t.resolved_at - t.created_at).total_seconds() / 3600.0 for t in a_tickets if t.resolved_at and t.created_at]
+                        avg_res = round(sum(durations) / len(durations), 2) if durations else 0.0
+                        reopened = sum(t.reopened_count or 0 for t in a_tickets)
+                        data.append({
+                            "Agent Name": a.full_name,
+                            "Team": a.team.name if a.team else "General",
+                            "Assigned": total,
+                            "Resolved": resolved,
+                            "Active Queue": active,
+                            "Avg Resolution (hrs)": avg_res,
+                            "SLA Compliance %": f"{comp_pct}%",
+                            "Reopened Count": reopened
+                        })
+                    data.sort(key=lambda x: (x["Resolved"], float(x["SLA Compliance %"].replace("%", ""))), reverse=True)
+                    for idx, row in enumerate(data):
+                        row["Rank"] = idx + 1
+                    df = pd.DataFrame(data)
+            except Exception:
+                df = pd.DataFrame()
 
         if not df.empty:
             # Normalize column names if needed
@@ -50,7 +80,7 @@ class AgentAnalytics:
             # Format SLA Compliance
             if "SLA Compliance %" in df.columns:
                 df["SLA Compliance %"] = df["SLA Compliance %"].apply(
-                    lambda x: f"{float(x):.1f}%" if pd.notnull(x) else "N/A"
+                    lambda x: f"{float(x):.1f}%" if pd.notnull(x) and not str(x).endswith("%") else str(x)
                 )
         return df
 

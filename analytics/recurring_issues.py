@@ -24,6 +24,35 @@ class RecurringIssueAnalytics:
         df = self.query_mgr.run_query_df(QUERY_RECURRING_PROBLEMS)
         if df.empty:
             df = self.query_mgr.call_procedure_df("get_recurring_issues", [min_count])
+
+        if df.empty:
+            from core.database import db
+            from core.models import Category, Ticket
+            try:
+                with db.get_session() as session:
+                    cats = session.query(Category).all()
+                    data = []
+                    for c in cats:
+                        c_tickets = c.tickets or []
+                        total = len(c_tickets)
+                        crit = sum(1 for t in c_tickets if t.priority == "Critical")
+                        high = sum(1 for t in c_tickets if t.priority == "High")
+                        reopen = sum(t.reopened_count or 0 for t in c_tickets)
+                        durations = [(t.resolved_at - t.created_at).total_seconds() / 3600.0 for t in c_tickets if t.resolved_at and t.created_at]
+                        avg_res = round(sum(durations) / len(durations), 2) if durations else 0.0
+                        data.append({
+                            "category_id": c.category_id,
+                            "category_name": c.name,
+                            "total_occurrences": total,
+                            "critical_count": crit,
+                            "high_count": high,
+                            "total_reopenings": reopen,
+                            "avg_resolution_hours": avg_res
+                        })
+                    data.sort(key=lambda x: x["total_occurrences"], reverse=True)
+                    df = pd.DataFrame(data)
+            except Exception:
+                df = pd.DataFrame()
         return df
 
     def get_problem_keyword_frequency(self) -> pd.DataFrame:

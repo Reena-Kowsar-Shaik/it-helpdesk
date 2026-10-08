@@ -193,6 +193,8 @@ class Ticket(Base):
     resolved_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     reopened_count = Column(Integer, nullable=False, default=0)
+    csat_rating = Column(Integer, nullable=True)  # 1 to 5 stars
+    csat_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -223,8 +225,8 @@ class TicketHistory(Base):
 
     history_id = Column(Integer, primary_key=True, autoincrement=True)
     ticket_id = Column(Integer, ForeignKey("tickets.ticket_id", ondelete="CASCADE"), nullable=False, index=True)
-    old_status = Column(String(30), nullable=True)
-    new_status = Column(String(30), nullable=False)
+    old_status = Column(String(20), nullable=True)
+    new_status = Column(String(20), nullable=False)
     changed_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     comment = Column(Text, nullable=True)
     changed_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -272,3 +274,21 @@ class TicketResolution(Base):
 
     def __repr__(self):
         return f"<TicketResolution(id={self.resolution_id}, ticket_id={self.ticket_id})>"
+
+
+class KnowledgeArticle(Base):
+    __tablename__ = "knowledge_articles"
+
+    article_id = Column(Integer, primary_key=True, autoincrement=True)
+    category_id = Column(Integer, ForeignKey("categories.category_id", ondelete="RESTRICT"), nullable=False)
+    title = Column(String(200), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    tags = Column(String(255), nullable=True)
+    views_count = Column(Integer, default=0)
+    helpful_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    category = relationship("Category")
+
+    def __repr__(self):
+        return f"<KnowledgeArticle(id={self.article_id}, title='{self.title}')>"
