@@ -23,6 +23,46 @@ st.set_page_config(
 apply_custom_styles()
 SessionManager.init_session()
 
+# Database Initialization Guard (Runs once per Streamlit server process)
+@st.cache_resource(show_spinner="Verifying database connectivity and schema...")
+def initialize_database():
+    """Validates connectivity, creates missing tables, and seeds reference data."""
+    try:
+        db.init_database()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+db_ready, db_err = initialize_database()
+if not db_ready:
+    st.error("🚨 **Database Connection / Initialization Failed**")
+    st.markdown(
+        f"""
+        The application was unable to establish a connection to the configured database.
+        
+        **Error Details:**
+        `{db_err}`
+        
+        ---
+        ### 🔧 How to Configure on Streamlit Community Cloud:
+        1. Navigate to your app in **Streamlit Community Cloud**.
+        2. Open **Settings** (⋮ menu at top-right) ➔ **Secrets**.
+        3. Add your database credentials using the TOML format below:
+        
+        ```toml
+        DB_TYPE = "mysql"
+        DB_HOST = "your-database-hostname"
+        DB_PORT = 3306
+        DB_USER = "your-database-username"
+        DB_PASSWORD = "your-database-password"
+        DB_NAME = "it_helpdesk_db"
+        ```
+        *(Or supply a single `DATABASE_URL = "mysql+mysqlconnector://<user>:<password>@<host>:<port>/<dbname>"`)*
+        """
+    )
+    st.stop()
+
+
 def render_login_page():
     """Renders authentication login screen with registration and demo credentials assistance."""
     col1, col2, col3 = st.columns([1, 2, 1])
