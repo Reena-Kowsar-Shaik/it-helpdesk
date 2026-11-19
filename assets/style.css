@@ -1,0 +1,268 @@
+/* ==========================================================
+   ENTERPRISE ULTRA-CLEAN SAAS DASHBOARD DESIGN
+   IT ServiceDesk Pro // Pixel-Perfect White Edition
+   ========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* Hide Streamlit generic elements */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header[data-testid="stHeader"] {display: none !important;}
+div[data-testid="stDecoration"] {display: none !important;}
+
+:root {
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --primary-border: #bfdbfe;
+    --bg-app: #f8fafc;
+    --bg-card: #ffffff;
+    --border-card: #e2e8f0;
+    --text-title: #0f172a;
+    --text-body: #334155;
+    --text-muted: #64748b;
+}
+
+/* Base App Reset */
+html, body, [class*="css"], .stApp {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    background-color: var(--bg-app) !important;
+    color: var(--text-title) !important;
+}
+
+code, pre, .stCodeBlock, span.stCode {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Page Spacing */
+.main .block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 2.5rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    max-width: 1400px !important;
+}
+
+/* SaaS Top Header */
+.saas-header {
+    background: #ffffff;
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.saas-title {
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: var(--text-title);
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.saas-subtitle {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    margin-top: 2px;
+    margin-bottom: 0;
+}
+
+/* Executive KPI Card */
+.stat-card {
+    background: #ffffff;
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+    height: 100%;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    border-color: #cbd5e1;
+}
+
+.stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.stat-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.stat-icon-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+}
+
+.stat-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: var(--text-title);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.stat-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* Framed Dashboard Widget Container */
+.widget-card {
+    background: #ffffff;
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    margin-bottom: 18px;
+}
+
+.widget-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.widget-card-title {
+    font-size: 1.0rem;
+    font-weight: 700;
+    color: var(--text-title);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Sidebar Styling & Custom Menu Pills */
+section[data-testid="stSidebar"] {
+    background-color: #ffffff !important;
+    border-right: 1px solid var(--border-card) !important;
+    padding-top: 1rem !important;
+}
+
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
+    gap: 4px !important;
+}
+
+section[data-testid="stSidebar"] .stRadio label {
+    font-size: 0.86rem !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    transition: all 0.15s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+}
+
+section[data-testid="stSidebar"] .stRadio label:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* Buttons */
+.stButton > button[kind="primary"] {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    padding: 8px 18px !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+    transition: all 0.15s ease !important;
+}
+
+.stButton > button[kind="primary"]:hover {
+    background: #1d4ed8 !important;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3) !important;
+}
+
+.stButton > button[kind="secondary"] {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    color: var(--text-body) !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    transition: all 0.15s ease !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    background: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    color: var(--text-title) !important;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 6px;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-card);
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 6px;
+    padding: 6px 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.84rem;
+}
+
+.stTabs [aria-selected="true"] {
+    background: #ffffff !important;
+    color: #2563eb !important;
+    font-weight: 700 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+    border: 1px solid var(--border-card) !important;
+}
+
+/* Dataframe Clean Styling */
+div[data-testid="stDataFrame"] {
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Clean Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
